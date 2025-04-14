@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 interface TradingViewWidgetConfig {
   width: string | number;
-  height: number;
+  height: string | number;
   symbol: string;
   interval: string;
   timezone: string;
@@ -40,7 +40,7 @@ export const TradingViewWidget = () => {
       if (typeof window.TradingView !== "undefined" && container.current?.id) {
         new window.TradingView.widget({
           width: "100%",
-          height: 600,
+          height: "100%",
           symbol: "BINANCE:BTCUSDT",
           interval: "60",
           timezone: "Asia/Taipei",
@@ -63,5 +63,9 @@ export const TradingViewWidget = () => {
     };
   }, []);
 
-  return <div id="tradingview_widget" ref={container} />;
+  return (
+    <div className="h-[calc(100vh-2rem)]">
+      <div id="tradingview_widget" ref={container} className="h-full" />
+    </div>
+  );
 };

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import dayjs from "dayjs";
 
 interface Trade {
   price: string;
@@ -15,23 +16,18 @@ interface RecentTradesProps {
 
 export const RecentTrades = ({ symbol }: RecentTradesProps) => {
   const [trades, setTrades] = useState<Trade[]>([]);
+  const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocket("wss://stream.binance.com:9443/ws");
+    // Create worker
+    workerRef.current = new Worker(
+      new URL("../workers/binanceWorker.ts", import.meta.url)
+    );
 
-    ws.onopen = () => {
-      ws.send(
-        JSON.stringify({
-          method: "SUBSCRIBE",
-          params: [`${symbol.toLowerCase()}@trade`],
-          id: 1,
-        })
-      );
-    };
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.p && data.q) {
+    // Listen for worker messages
+    workerRef.current.onmessage = (event) => {
+      const data = event.data;
+      if (data.e === "trade") {
         const newTrade: Trade = {
           price: data.p,
           quantity: data.q,
@@ -42,19 +38,26 @@ export const RecentTrades = ({ symbol }: RecentTradesProps) => {
       }
     };
 
+    // Connect WebSocket
+    workerRef.current.postMessage({ type: "connect", symbol });
+
+    // Cleanup on component unmount
     return () => {
-      ws.close();
+      if (workerRef.current) {
+        workerRef.current.postMessage({ type: "disconnect" });
+        workerRef.current.terminate();
+      }
     };
   }, [symbol]);
 
   return (
-    <div className="bg-[#1E1E1E] p-4 h-full">
+    <div className="bg-[#1E1E1E] p-4 h-[calc(100vh-2rem)]">
       <div className="grid grid-cols-3 text-xs text-gray-400 gap-2 pb-2 border-b border-gray-800">
         <div>價格</div>
         <div className="text-right">數量</div>
         <div className="text-right">時間</div>
       </div>
-      <div className="h-[600px] overflow-y-auto">
+      <div className="h-[calc(100%-2rem)] overflow-y-auto">
         {trades.map((trade, index) => (
           <div
             key={index}
@@ -69,7 +72,7 @@ export const RecentTrades = ({ symbol }: RecentTradesProps) => {
               {parseFloat(trade.quantity).toFixed(4)}
             </div>
             <div className="text-right">
-              {new Date(trade.time).toLocaleTimeString()}
+              {dayjs(trade.time).format("HH:mm:ss")}
             </div>
           </div>
         ))}

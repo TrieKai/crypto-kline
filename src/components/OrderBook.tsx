@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface OrderBookEntry {
   price: string;
@@ -15,22 +15,17 @@ interface OrderBookProps {
 export const OrderBook = ({ symbol }: OrderBookProps) => {
   const [asks, setAsks] = useState<OrderBookEntry[]>([]);
   const [bids, setBids] = useState<OrderBookEntry[]>([]);
+  const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocket("wss://stream.binance.com:9443/ws");
+    // Create worker
+    workerRef.current = new Worker(
+      new URL("../workers/binanceWorker.ts", import.meta.url)
+    );
 
-    ws.onopen = () => {
-      ws.send(
-        JSON.stringify({
-          method: "SUBSCRIBE",
-          params: [`${symbol.toLowerCase()}@depth20@100ms`],
-          id: 1,
-        })
-      );
-    };
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+    // Listen for worker messages
+    workerRef.current.onmessage = (event) => {
+      const data = event.data;
       if (data.asks && data.bids) {
         const processOrders = (orders: string[][]) =>
           orders.map(([price, quantity]) => ({
@@ -44,8 +39,15 @@ export const OrderBook = ({ symbol }: OrderBookProps) => {
       }
     };
 
+    // Connect WebSocket
+    workerRef.current.postMessage({ type: "connect", symbol });
+
+    // Cleanup on component unmount
     return () => {
-      ws.close();
+      if (workerRef.current) {
+        workerRef.current.postMessage({ type: "disconnect" });
+        workerRef.current.terminate();
+      }
     };
   }, [symbol]);
 
@@ -69,13 +71,13 @@ export const OrderBook = ({ symbol }: OrderBookProps) => {
   );
 
   return (
-    <div className="bg-[#1E1E1E] p-4 h-full">
+    <div className="bg-[#1E1E1E] p-4 h-[calc(100vh-2rem)]">
       <div className="grid grid-cols-3 text-xs text-gray-400 gap-2 pb-2 border-b border-gray-800">
         <div>價格</div>
         <div className="text-right">數量</div>
         <div className="text-right">總計</div>
       </div>
-      <div className="h-full overflow-y-auto space-y-2">
+      <div className="h-[calc(100%-2rem)] overflow-y-auto space-y-2">
         {renderOrders(asks.slice().reverse(), true)}
         <div className="border-t border-b border-gray-800 py-2 text-center text-sm">
           {parseFloat(bids[0]?.price || "0").toFixed(2)}

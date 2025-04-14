@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@binance/connector": "^3.6.1",
+    "dayjs": "^1.11.13",
     "lightweight-charts": "^5.0.5",
     "next": "15.1.6",
     "react": "^19.0.0",
