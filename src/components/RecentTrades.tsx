@@ -6,11 +6,17 @@ import dayjs from "dayjs";
 import { Trade, TradeData } from "@/types/binance";
 import { BinanceService } from "@/services/binanceService";
 
+interface TradeRowProps {
+  index: number;
+  style: React.CSSProperties;
+  data: Trade[];
+}
+
 interface RecentTradesProps {
   symbol: string;
 }
 
-const TradeRow = ({ index, style, data }: any) => {
+const TradeRow = ({ index, style, data }: TradeRowProps) => {
   const trade = data[index];
   return (
     <div
@@ -53,7 +59,7 @@ export const RecentTrades = ({ symbol }: RecentTradesProps) => {
         <div className="text-right">數量</div>
         <div className="text-right">時間</div>
       </div>
-      <div className="h-[calc(100%-2.5rem)]">
+      <div className="h-[calc(100%-1rem)] overflow-hidden">
         <List
           height={containerRef.current?.clientHeight ?? 400}
           itemCount={trades.length}

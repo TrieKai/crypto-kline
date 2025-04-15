@@ -1,3 +1,10 @@
+import { OrderBookData, TradeData } from "@/types/binance";
+
+type EventMap = {
+  trade: TradeData;
+  orderbook: OrderBookData;
+};
+
 export class BinanceService {
   private static instance: BinanceService;
   private worker: Worker | null = null;
@@ -31,10 +38,10 @@ export class BinanceService {
     };
   }
 
-  subscribe(
-    type: "trade" | "orderbook",
+  subscribe<T extends keyof EventMap>(
+    type: T,
     symbol: string,
-    callback: (data: any) => void
+    callback: (data: EventMap[T]) => void
   ) {
     const key = `${type}:${symbol}`;
     if (!this.subscribers.has(key)) {
@@ -44,10 +51,10 @@ export class BinanceService {
     this.subscribers.get(key)?.add(callback);
   }
 
-  unsubscribe(
-    type: "trade" | "orderbook",
+  unsubscribe<T extends keyof EventMap>(
+    type: T,
     symbol: string,
-    callback: (data: any) => void
+    callback: (data: EventMap[T]) => void
   ) {
     const key = `${type}:${symbol}`;
     this.subscribers.get(key)?.delete(callback);
@@ -57,9 +64,13 @@ export class BinanceService {
     }
   }
 
-  private notifySubscribers(type: string, data: any) {
-    for (const [key, callbacks] of this.subscribers.entries()) {
-      if (key.startsWith(type)) {
+  private notifySubscribers<T extends keyof EventMap>(
+    type: T,
+    data: EventMap[T]
+  ) {
+    const key = `${type}:`;
+    for (const [subscriberKey, callbacks] of this.subscribers.entries()) {
+      if (subscriberKey.startsWith(key)) {
         callbacks.forEach((callback) => callback(data));
       }
     }

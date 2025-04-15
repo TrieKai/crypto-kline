@@ -5,16 +5,27 @@ import { FixedSizeList as List } from "react-window";
 import { OrderBookEntry, OrderBookData } from "@/types/binance";
 import { BinanceService } from "@/services/binanceService";
 
+interface OrderRowData {
+  order: OrderBookEntry;
+  isAsk: boolean;
+}
+
+interface OrderRowProps {
+  index: number;
+  style: React.CSSProperties;
+  data: OrderRowData[];
+}
+
 interface OrderBookProps {
   symbol: string;
 }
 
-const OrderRow = ({ index, style, data }: any) => {
+const OrderRow = ({ index, style, data }: OrderRowProps) => {
   const { order, isAsk } = data[index];
   return (
     <div
       style={style}
-      className="grid grid-cols-3 text-xs gap-2 hover:bg-gray-800"
+      className="grid grid-cols-3 items-center text-xs gap-2 hover:bg-gray-800"
     >
       <div className={isAsk ? "text-red-500" : "text-green-500"}>
         {parseFloat(order.price).toFixed(2)}
@@ -29,6 +40,13 @@ export const OrderBook = ({ symbol }: OrderBookProps) => {
   const [asks, setAsks] = useState<OrderBookEntry[]>([]);
   const [bids, setBids] = useState<OrderBookEntry[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const asksData = asks
+    .slice()
+    .reverse()
+    .map((order) => ({ order, isAsk: true }));
+  const bidsData = bids.map((order) => ({ order, isAsk: false }));
+  const allData = [...asksData, ...bidsData];
 
   useEffect(() => {
     const service = BinanceService.getInstance();
@@ -48,13 +66,6 @@ export const OrderBook = ({ symbol }: OrderBookProps) => {
     return () => service.unsubscribe("orderbook", symbol, handleOrderBook);
   }, [symbol]);
 
-  const asksData = asks
-    .slice()
-    .reverse()
-    .map((order) => ({ order, isAsk: true }));
-  const bidsData = bids.map((order) => ({ order, isAsk: false }));
-  const allData = [...asksData, ...bidsData];
-
   return (
     <div className="bg-[#1E1E1E] p-4 h-screen" ref={containerRef}>
       <div className="grid grid-cols-3 text-xs text-gray-400 gap-2 pb-2 border-b border-gray-800">
@@ -62,7 +73,7 @@ export const OrderBook = ({ symbol }: OrderBookProps) => {
         <div className="text-right">數量</div>
         <div className="text-right">總計</div>
       </div>
-      <div className="h-[calc(100%-2.5rem)]">
+      <div className="h-[calc(100%-1rem)] overflow-hidden">
         <List
           height={containerRef.current?.clientHeight ?? 400}
           itemCount={allData.length}
