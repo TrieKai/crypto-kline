@@ -1,18 +1,28 @@
 let ws: WebSocket | null = null;
 let reconnectTimeout: NodeJS.Timeout | null = null;
 let heartbeatInterval: NodeJS.Timeout | null = null;
-const RECONNECT_DELAY = 5000;
+let isConnecting = false;
+let currentSymbol: string | null = null;
+const RECONNECT_DELAY = 1000;
 const HEARTBEAT_INTERVAL = 30000;
 
 function connect(symbol: string) {
+  if (isConnecting) {
+    return;
+  }
+
   try {
-    if (ws) {
+    if (ws?.readyState === WebSocket.OPEN) {
       ws.close();
     }
+
+    isConnecting = true;
+    currentSymbol = symbol;
 
     ws = new WebSocket("wss://stream.binance.com:9443/ws");
 
     ws.onopen = () => {
+      isConnecting = false;
       if (!ws) {
         return;
       }
@@ -48,6 +58,10 @@ function connect(symbol: string) {
     };
 
     ws.onclose = () => {
+      if (isConnecting) {
+        return;
+      }
+
       // Try to reconnect
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
@@ -55,14 +69,20 @@ function connect(symbol: string) {
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
       }
-      reconnectTimeout = setTimeout(() => connect(symbol), RECONNECT_DELAY);
+      reconnectTimeout = setTimeout(() => {
+        if (currentSymbol) {
+          connect(currentSymbol);
+        }
+      }, RECONNECT_DELAY);
     };
 
     ws.onerror = (error) => {
       console.error("WebSocket error:", error);
       if (ws) {
         ws.close();
+        ws = null;
       }
+      isConnecting = false;
     };
   } catch (error) {
     console.error("Connection error:", error);

@@ -1,88 +1,77 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-
-interface OrderBookEntry {
-  price: string;
-  quantity: string;
-  total?: string;
-}
+import { FixedSizeList as List } from "react-window";
+import { OrderBookEntry, OrderBookData } from "@/types/binance";
+import { BinanceService } from "@/services/binanceService";
 
 interface OrderBookProps {
   symbol: string;
 }
 
+const OrderRow = ({ index, style, data }: any) => {
+  const { order, isAsk } = data[index];
+  return (
+    <div
+      style={style}
+      className="grid grid-cols-3 text-xs gap-2 hover:bg-gray-800"
+    >
+      <div className={isAsk ? "text-red-500" : "text-green-500"}>
+        {parseFloat(order.price).toFixed(2)}
+      </div>
+      <div className="text-right">{parseFloat(order.quantity).toFixed(4)}</div>
+      <div className="text-right">{order.total}</div>
+    </div>
+  );
+};
+
 export const OrderBook = ({ symbol }: OrderBookProps) => {
   const [asks, setAsks] = useState<OrderBookEntry[]>([]);
   const [bids, setBids] = useState<OrderBookEntry[]>([]);
-  const workerRef = useRef<Worker | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Create worker
-    workerRef.current = new Worker(
-      new URL("../workers/binanceWorker.ts", import.meta.url)
-    );
+    const service = BinanceService.getInstance();
+    const handleOrderBook = (data: OrderBookData) => {
+      const processOrders = (orders: string[][]) =>
+        orders.map(([price, quantity]) => ({
+          price,
+          quantity,
+          total: (parseFloat(price) * parseFloat(quantity)).toFixed(2),
+        }));
 
-    // Listen for worker messages
-    workerRef.current.onmessage = (event) => {
-      const data = event.data;
-      if (data.asks && data.bids) {
-        const processOrders = (orders: string[][]) =>
-          orders.map(([price, quantity]) => ({
-            price,
-            quantity,
-            total: (parseFloat(price) * parseFloat(quantity)).toFixed(2),
-          }));
-
-        setAsks(processOrders(data.asks));
-        setBids(processOrders(data.bids));
-      }
+      setAsks(processOrders(data.asks));
+      setBids(processOrders(data.bids));
     };
 
-    // Connect WebSocket
-    workerRef.current.postMessage({ type: "connect", symbol });
-
-    // Cleanup on component unmount
-    return () => {
-      if (workerRef.current) {
-        workerRef.current.postMessage({ type: "disconnect" });
-        workerRef.current.terminate();
-      }
-    };
+    service.subscribe("orderbook", symbol, handleOrderBook);
+    return () => service.unsubscribe("orderbook", symbol, handleOrderBook);
   }, [symbol]);
 
-  const renderOrders = (orders: OrderBookEntry[], isAsk: boolean) => (
-    <div className="space-y-1">
-      {orders.map((order, index) => (
-        <div
-          key={index}
-          className="grid grid-cols-3 text-xs gap-2 hover:bg-gray-800"
-        >
-          <div className={isAsk ? "text-red-500" : "text-green-500"}>
-            {parseFloat(order.price).toFixed(2)}
-          </div>
-          <div className="text-right">
-            {parseFloat(order.quantity).toFixed(4)}
-          </div>
-          <div className="text-right">{order.total}</div>
-        </div>
-      ))}
-    </div>
-  );
+  const asksData = asks
+    .slice()
+    .reverse()
+    .map((order) => ({ order, isAsk: true }));
+  const bidsData = bids.map((order) => ({ order, isAsk: false }));
+  const allData = [...asksData, ...bidsData];
 
   return (
-    <div className="bg-[#1E1E1E] p-4 h-[calc(100vh-2rem)]">
+    <div className="bg-[#1E1E1E] p-4 h-screen" ref={containerRef}>
       <div className="grid grid-cols-3 text-xs text-gray-400 gap-2 pb-2 border-b border-gray-800">
         <div>價格</div>
         <div className="text-right">數量</div>
         <div className="text-right">總計</div>
       </div>
-      <div className="h-[calc(100%-2rem)] overflow-y-auto space-y-2">
-        {renderOrders(asks.slice().reverse(), true)}
-        <div className="border-t border-b border-gray-800 py-2 text-center text-sm">
-          {parseFloat(bids[0]?.price || "0").toFixed(2)}
-        </div>
-        {renderOrders(bids, false)}
+      <div className="h-[calc(100%-2.5rem)]">
+        <List
+          height={containerRef.current?.clientHeight ?? 400}
+          itemCount={allData.length}
+          itemSize={24}
+          width="100%"
+          itemData={allData}
+        >
+          {OrderRow}
+        </List>
       </div>
     </div>
   );
