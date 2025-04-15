@@ -8,7 +8,10 @@ type EventMap = {
 export class BinanceService {
   private static instance: BinanceService;
   private worker: Worker | null = null;
-  private subscribers: Map<string, Set<(data: any) => void>> = new Map();
+  private subscribers: Map<
+    string,
+    Set<(data: OrderBookData | TradeData) => void>
+  > = new Map();
 
   private constructor() {
     this.initWorker();
@@ -38,11 +41,11 @@ export class BinanceService {
     };
   }
 
-  subscribe<T extends keyof EventMap>(
-    type: T,
+  subscribe(
+    type: keyof EventMap,
     symbol: string,
-    callback: (data: EventMap[T]) => void
-  ) {
+    callback: (data: OrderBookData | TradeData) => void
+  ): void {
     const key = `${type}:${symbol}`;
     if (!this.subscribers.has(key)) {
       this.subscribers.set(key, new Set());
@@ -51,11 +54,11 @@ export class BinanceService {
     this.subscribers.get(key)?.add(callback);
   }
 
-  unsubscribe<T extends keyof EventMap>(
-    type: T,
+  unsubscribe(
+    type: keyof EventMap,
     symbol: string,
-    callback: (data: EventMap[T]) => void
-  ) {
+    callback: (data: OrderBookData | TradeData) => void
+  ): void {
     const key = `${type}:${symbol}`;
     this.subscribers.get(key)?.delete(callback);
     if (this.subscribers.get(key)?.size === 0) {
@@ -64,10 +67,10 @@ export class BinanceService {
     }
   }
 
-  private notifySubscribers<T extends keyof EventMap>(
-    type: T,
-    data: EventMap[T]
-  ) {
+  private notifySubscribers(
+    type: keyof EventMap,
+    data: OrderBookData | TradeData
+  ): void {
     const key = `${type}:`;
     for (const [subscriberKey, callbacks] of this.subscribers.entries()) {
       if (subscriberKey.startsWith(key)) {

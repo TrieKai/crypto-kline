@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FixedSizeList as List } from "react-window";
-import { OrderBookEntry, OrderBookData } from "@/types/binance";
 import { BinanceService } from "@/services/binanceService";
+import type { OrderBookEntry, OrderBookData, TradeData } from "@/types/binance";
 
 interface OrderRowData {
   order: OrderBookEntry;
@@ -50,16 +50,18 @@ export const OrderBook = ({ symbol }: OrderBookProps) => {
 
   useEffect(() => {
     const service = BinanceService.getInstance();
-    const handleOrderBook = (data: OrderBookData) => {
-      const processOrders = (orders: string[][]) =>
-        orders.map(([price, quantity]) => ({
-          price,
-          quantity,
-          total: (parseFloat(price) * parseFloat(quantity)).toFixed(2),
-        }));
+    const handleOrderBook = (data: OrderBookData | TradeData) => {
+      if ("asks" in data && "bids" in data) {
+        const processOrders = (orders: string[][]) =>
+          orders.map(([price, quantity]) => ({
+            price,
+            quantity,
+            total: (parseFloat(price) * parseFloat(quantity)).toFixed(2),
+          }));
 
-      setAsks(processOrders(data.asks));
-      setBids(processOrders(data.bids));
+        setAsks(processOrders(data.asks));
+        setBids(processOrders(data.bids));
+      }
     };
 
     service.subscribe("orderbook", symbol, handleOrderBook);

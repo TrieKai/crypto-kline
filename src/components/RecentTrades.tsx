@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { FixedSizeList as List } from "react-window";
 import dayjs from "dayjs";
-import { Trade, TradeData } from "@/types/binance";
 import { BinanceService } from "@/services/binanceService";
+import type { Trade, TradeData, OrderBookData } from "@/types/binance";
 
 interface TradeRowProps {
   index: number;
@@ -38,14 +38,16 @@ export const RecentTrades = ({ symbol }: RecentTradesProps) => {
 
   useEffect(() => {
     const service = BinanceService.getInstance();
-    const handleTrade = (data: TradeData) => {
-      const newTrade: Trade = {
-        price: data.p,
-        quantity: data.q,
-        time: data.T,
-        isBuyerMaker: data.m,
-      };
-      setTrades((prev) => [newTrade, ...prev]);
+    const handleTrade = (data: OrderBookData | TradeData): void => {
+      if ("p" in data && "q" in data && "T" in data && "m" in data) {
+        const newTrade: Trade = {
+          price: data.p,
+          quantity: data.q,
+          time: data.T,
+          isBuyerMaker: data.m,
+        };
+        setTrades((prev) => [newTrade, ...prev]);
+      }
     };
 
     service.subscribe("trade", symbol, handleTrade);
