@@ -49,7 +49,6 @@ export const OrderBook = ({ symbol }: OrderBookProps) => {
     .reverse()
     .map((order) => ({ order, isAsk: true }));
   const bidsData = bids.map((order) => ({ order, isAsk: false }));
-  const allData = [...asksData, ...bidsData];
 
   useEffect(() => {
     const service = BinanceService.getInstance();
