@@ -35,6 +35,7 @@ const TradeRow = ({ index, style, data }: TradeRowProps) => {
 export const RecentTrades = ({ symbol }: RecentTradesProps) => {
   const [trades, setTrades] = useState<Trade[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prevPriceRef = useRef<string>("");
 
   useEffect(() => {
     const service = BinanceService.getInstance();
@@ -47,30 +48,44 @@ export const RecentTrades = ({ symbol }: RecentTradesProps) => {
           isBuyerMaker: data.m,
         };
         setTrades((prev) => [newTrade, ...prev]);
+        prevPriceRef.current = data.p;
       }
     };
 
     service.subscribe("trade", symbol, handleTrade);
-    return () => service.unsubscribe("trade", symbol, handleTrade);
+
+    return () => {
+      service.unsubscribe("trade", symbol, handleTrade);
+    };
   }, [symbol]);
 
   return (
-    <div className="bg-[#1E1E1E] p-4 h-screen" ref={containerRef}>
-      <div className="grid grid-cols-3 text-xs text-gray-400 gap-2 pb-2 border-b border-gray-800">
-        <div>價格</div>
-        <div className="text-right">數量</div>
-        <div className="text-right">時間</div>
-      </div>
-      <div className="h-[calc(100%-1rem)] overflow-hidden">
-        <List
-          height={containerRef.current?.clientHeight ?? 400}
-          itemCount={trades.length}
-          itemSize={24}
-          width="100%"
-          itemData={trades}
-        >
-          {TradeRow}
-        </List>
+    <div className="bg-[#1E1E1E] p-4 h-screen flex flex-col" ref={containerRef}>
+      {/* Title */}
+      <div className="text-sm text-gray-300 font-medium mb-2">最新成交</div>
+
+      <div className="flex flex-col flex-1">
+        {/* Header */}
+        <div className="grid grid-cols-3 text-xs text-gray-400 gap-2 py-2 border-b border-gray-800">
+          <div>價格</div>
+          <div className="text-right">數量</div>
+          <div className="text-right">時間</div>
+        </div>
+
+        {/* Trade List */}
+        <div className="flex-1 overflow-hidden min-h-0">
+          <List
+            height={Math.floor(
+              (containerRef.current?.clientHeight ?? 800) * 0.8
+            )}
+            itemCount={trades.length}
+            itemSize={24}
+            width="100%"
+            itemData={trades}
+          >
+            {TradeRow}
+          </List>
+        </div>
       </div>
     </div>
   );
