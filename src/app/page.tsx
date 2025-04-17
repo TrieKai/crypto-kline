@@ -13,17 +13,17 @@ export default function Home() {
       <div className="w-full h-full">
         <div className="grid grid-cols-12">
           {/* 委託訂單 */}
-          <div className="col-span-3">
+          <div className="col-span-2">
             <OrderBook symbol={symbol} />
           </div>
 
           {/* TradingView 圖表 */}
-          <div className="col-span-6">
+          <div className="col-span-8">
             <TradingViewWidget />
           </div>
 
           {/* 最新成交 */}
-          <div className="col-span-3">
+          <div className="col-span-2">
             <RecentTrades symbol={symbol} />
           </div>
         </div>
