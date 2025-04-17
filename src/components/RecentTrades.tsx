@@ -32,6 +32,8 @@ const TradeRow = ({ index, style, data }: TradeRowProps) => {
   );
 };
 
+const MAX_TRADES = 1000;
+
 export const RecentTrades = ({ symbol }: RecentTradesProps) => {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [listHeight, setListHeight] = useState<number>(0);
@@ -80,7 +82,10 @@ export const RecentTrades = ({ symbol }: RecentTradesProps) => {
           time: data.T,
           isBuyerMaker: data.m,
         };
-        setTrades((prev) => [newTrade, ...prev]);
+        setTrades((prev) => {
+          const newTrades = [newTrade, ...prev];
+          return newTrades.slice(0, MAX_TRADES);
+        });
         prevPriceRef.current = data.p;
       }
     };

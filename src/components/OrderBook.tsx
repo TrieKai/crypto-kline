@@ -47,11 +47,13 @@ export const OrderBook = ({ symbol }: OrderBookProps) => {
   const bidsContainerRef = useRef<HTMLDivElement>(null);
   const prevPriceRef = useRef<string>("");
 
-  const asksData = asks
-    .slice()
-    .reverse()
+  // Sort asks and bids by price
+  const asksData = [...asks]
+    .sort((a, b) => parseFloat(a.price) - parseFloat(b.price))
     .map((order) => ({ order, isAsk: true }));
-  const bidsData = bids.map((order) => ({ order, isAsk: false }));
+  const bidsData = [...bids]
+    .sort((a, b) => parseFloat(b.price) - parseFloat(a.price))
+    .map((order) => ({ order, isAsk: false }));
 
   // Handle height calculation
   useEffect(() => {
@@ -92,12 +94,17 @@ export const OrderBook = ({ symbol }: OrderBookProps) => {
     const handleOrderBook = (data: OrderBookData | TradeData): void => {
       if ("asks" in data && "bids" in data) {
         const processOrders = (orders: string[][]): OrderBookEntry[] =>
-          orders.map(([price, quantity]) => ({
-            price,
-            quantity,
-            total: (parseFloat(price) * parseFloat(quantity)).toFixed(2),
-          }));
+          orders.map(([price, quantity]) => {
+            const priceFloat = parseFloat(price);
+            const quantityFloat = parseFloat(quantity);
+            return {
+              price,
+              quantity,
+              total: (priceFloat * quantityFloat).toFixed(2),
+            };
+          });
 
+        // Update all orders
         setAsks(processOrders(data.asks));
         setBids(processOrders(data.bids));
       } else if ("p" in data && "q" in data) {
