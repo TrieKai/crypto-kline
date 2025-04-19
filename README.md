@@ -2,6 +2,10 @@
 
 A real-time cryptocurrency trading view application built with Next.js, featuring live price updates, order book visualization, and recent trades tracking. The application is also available as a Progressive Web App (PWA) for enhanced mobile experience.
 
+## Demo
+
+![Demo](/public/demo.gif)
+
 ## Features
 
 ### Core Features
