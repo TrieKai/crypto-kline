@@ -3,8 +3,10 @@ let reconnectTimeout: NodeJS.Timeout | null = null;
 let heartbeatInterval: NodeJS.Timeout | null = null;
 let isConnecting = false;
 let currentSymbol: string | null = null;
+let lastTradeTime = 0;
 const RECONNECT_DELAY = 1000;
 const HEARTBEAT_INTERVAL = 30000;
+const TRADE_THROTTLE = 10; // 10ms throttle for trade updates
 
 function connect(symbol: string) {
   if (isConnecting) {
@@ -54,7 +56,18 @@ function connect(symbol: string) {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      self.postMessage(data);
+
+      // If it's trade data, apply throttle
+      if (data.e === "trade") {
+        const now = Date.now();
+        if (now - lastTradeTime >= TRADE_THROTTLE) {
+          self.postMessage(data);
+          lastTradeTime = now;
+        }
+      } else {
+        // Send other data directly
+        self.postMessage(data);
+      }
     };
 
     ws.onclose = () => {
