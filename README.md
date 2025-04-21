@@ -44,6 +44,7 @@ A real-time cryptocurrency trading view application built with Next.js, featurin
 - **Framework**: [Next.js](https://nextjs.org/) with TypeScript
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 - **Charts**: [Lightweight Charts™](https://www.tradingview.com/lightweight-charts/)
+- **Store**: [Zustand](https://github.com/pmndrs/zustand)
 - **Data Source**: [Binance WebSocket API](https://binance-docs.github.io/apidocs/spot/en/)
 - **PWA**: [next-pwa](https://www.npmjs.com/package/next-pwa)
 
