@@ -4,26 +4,52 @@ let heartbeatInterval: NodeJS.Timeout | null = null;
 let isConnecting = false;
 let currentSymbol: string | null = null;
 let lastTradeTime = 0;
+let isClosing = false;
+
 const RECONNECT_DELAY = 1000;
 const HEARTBEAT_INTERVAL = 30000;
 const TRADE_THROTTLE = 10; // 10ms throttle for trade updates
+const MAX_RETRIES = 3;
+let retryCount = 0;
 
-function connect(symbol: string) {
+function cleanupConnection(): void {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+  if (ws) {
+    ws.onclose = null; // Remove event listener to avoid multiple triggers
+    ws.onerror = null;
+    ws.onmessage = null;
+    ws.onopen = null;
+    if (ws.readyState === WebSocket.OPEN) {
+      isClosing = true;
+      ws.close();
+    }
+    ws = null;
+  }
+  isConnecting = false;
+  isClosing = false;
+}
+
+function connect(symbol: string): void {
   if (isConnecting) {
     return;
   }
 
   try {
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.close();
-    }
-
+    cleanupConnection();
     isConnecting = true;
     currentSymbol = symbol;
+    retryCount = 0;
 
     ws = new WebSocket("wss://stream.binance.com:9443/ws");
 
-    ws.onopen = () => {
+    ws.onopen = (): void => {
       isConnecting = false;
       if (!ws) {
         return;
@@ -47,63 +73,86 @@ function connect(symbol: string) {
       }
 
       // Send heartbeat
-      heartbeatInterval = setInterval(() => {
+      heartbeatInterval = setInterval((): void => {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ ping: Date.now() }));
         }
       }, HEARTBEAT_INTERVAL);
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = (event: MessageEvent): void => {
       const data = JSON.parse(event.data);
 
-      // If it's trade data, apply throttle
+      // Handle different types of messages
       if (data.e === "trade") {
         const now = Date.now();
         if (now - lastTradeTime >= TRADE_THROTTLE) {
-          self.postMessage(data);
+          self.postMessage({
+            type: "trade",
+            data: {
+              price: data.p,
+              quantity: data.q,
+              time: data.T,
+              isBuyerMaker: data.m,
+            },
+          });
           lastTradeTime = now;
         }
-      } else {
-        // Send other data directly
-        self.postMessage(data);
+      } else if (data.asks && data.bids) {
+        // Process order book data
+        self.postMessage({
+          type: "orderbook",
+          data: {
+            asks: data.asks.map(([price, quantity]: string[]) => ({
+              price,
+              quantity,
+              total: (parseFloat(price) * parseFloat(quantity)).toFixed(2),
+            })),
+            bids: data.bids.map(([price, quantity]: string[]) => ({
+              price,
+              quantity,
+              total: (parseFloat(price) * parseFloat(quantity)).toFixed(2),
+            })),
+          },
+        });
       }
     };
 
-    ws.onclose = () => {
-      if (isConnecting) {
+    ws.onclose = (): void => {
+      if (isClosing) {
         return;
       }
 
-      // Try to reconnect
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+        console.log(
+          `Connection closed. Retrying in ${delay}ms... (Attempt ${retryCount}/${MAX_RETRIES})`
+        );
+
+        reconnectTimeout = setTimeout((): void => {
+          if (currentSymbol) {
+            connect(currentSymbol);
+          }
+        }, delay);
+      } else {
+        console.error("Max retries reached. Please check your connection.");
       }
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-      }
-      reconnectTimeout = setTimeout(() => {
-        if (currentSymbol) {
-          connect(currentSymbol);
-        }
-      }, RECONNECT_DELAY);
     };
 
-    ws.onerror = (error) => {
+    ws.onerror = (error): void => {
       console.error("WebSocket error:", error);
-      if (ws) {
-        ws.close();
-        ws = null;
-      }
-      isConnecting = false;
+      cleanupConnection();
     };
   } catch (error) {
     console.error("Connection error:", error);
-    reconnectTimeout = setTimeout(() => connect(symbol), RECONNECT_DELAY);
+    reconnectTimeout = setTimeout((): void => {
+      connect(symbol);
+    }, RECONNECT_DELAY);
   }
 }
 
-self.onmessage = (event: MessageEvent) => {
+self.onmessage = (event: MessageEvent): void => {
   const { type, symbol } = event.data;
 
   switch (type) {
@@ -111,18 +160,7 @@ self.onmessage = (event: MessageEvent) => {
       connect(symbol);
       break;
     case "disconnect":
-      if (ws) {
-        ws.close();
-        ws = null;
-      }
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-        reconnectTimeout = null;
-      }
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-        heartbeatInterval = null;
-      }
+      cleanupConnection();
       break;
   }
 };

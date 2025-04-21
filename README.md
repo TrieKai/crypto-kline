@@ -4,7 +4,7 @@ A real-time cryptocurrency trading view application built with Next.js, featurin
 
 ## Demo
 
-![Demo](/public/demo.gif)
+![Demo](public/demo.gif)
 
 ## Features
 

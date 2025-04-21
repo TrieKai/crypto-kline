@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { FixedSizeList as List } from "react-window";
 import dayjs from "dayjs";
 import { BinanceService } from "@/services/binanceService";
-import type { Trade, TradeData, OrderBookData } from "@/types/binance";
+import { useMarketStore } from "@/store/marketStore";
+import type { Trade } from "@/types/binance";
 
 interface TradeRowProps {
   index: number;
@@ -32,14 +33,11 @@ const TradeRow = ({ index, style, data }: TradeRowProps) => {
   );
 };
 
-const MAX_TRADES = 1000;
-
 export const RecentTrades = ({ symbol }: RecentTradesProps) => {
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [listHeight, setListHeight] = useState<number>(0);
+  const [listHeight, setListHeight] = useState(0);
+  const trades = useMarketStore((state) => state.trades);
   const containerRef = useRef<HTMLDivElement>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
-  const prevPriceRef = useRef<string>("");
 
   // Handle height calculation
   useEffect(() => {
@@ -71,29 +69,13 @@ export const RecentTrades = ({ symbol }: RecentTradesProps) => {
     };
   }, []);
 
-  // Handle trade data
+  // Subscribe to WebSocket
   useEffect(() => {
     const service = BinanceService.getInstance();
-    const handleTrade = (data: OrderBookData | TradeData): void => {
-      if ("p" in data && "q" in data && "T" in data && "m" in data) {
-        const newTrade: Trade = {
-          price: data.p,
-          quantity: data.q,
-          time: data.T,
-          isBuyerMaker: data.m,
-        };
-        setTrades((prev) => {
-          const newTrades = [newTrade, ...prev];
-          return newTrades.slice(0, MAX_TRADES);
-        });
-        prevPriceRef.current = data.p;
-      }
-    };
-
-    service.subscribe("trade", symbol, handleTrade);
+    service.subscribe(symbol);
 
     return () => {
-      service.unsubscribe("trade", symbol, handleTrade);
+      service.unsubscribe();
     };
   }, [symbol]);
 

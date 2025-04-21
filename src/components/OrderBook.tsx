@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { FixedSizeList as List } from "react-window";
 import clsx from "clsx";
 import { BinanceService } from "@/services/binanceService";
-import type { OrderBookEntry, OrderBookData, TradeData } from "@/types/binance";
+import { useMarketStore } from "@/store/marketStore";
+import type { OrderBookEntry } from "@/types/binance";
 
 interface OrderRowData {
   order: OrderBookEntry;
@@ -38,14 +39,13 @@ const OrderRow = ({ index, style, data }: OrderRowProps) => {
 };
 
 export const OrderBook = ({ symbol }: OrderBookProps) => {
-  const [asks, setAsks] = useState<OrderBookEntry[]>([]);
-  const [bids, setBids] = useState<OrderBookEntry[]>([]);
-  const [lastPrice, setLastPrice] = useState<string>("");
   const [listHeight, setListHeight] = useState<number>(0);
+  const asks = useMarketStore((state) => state.asks);
+  const bids = useMarketStore((state) => state.bids);
+  const lastPrice = useMarketStore((state) => state.lastPrice);
   const containerRef = useRef<HTMLDivElement>(null);
   const asksContainerRef = useRef<HTMLDivElement>(null);
   const bidsContainerRef = useRef<HTMLDivElement>(null);
-  const prevPriceRef = useRef<string>("");
 
   // Sort asks and bids by price
   const asksData = [...asks]
@@ -88,38 +88,13 @@ export const OrderBook = ({ symbol }: OrderBookProps) => {
     };
   }, []);
 
-  // Handle order book and trade data
+  // Subscribe to WebSocket
   useEffect(() => {
     const service = BinanceService.getInstance();
-    const handleOrderBook = (data: OrderBookData | TradeData): void => {
-      if ("asks" in data && "bids" in data) {
-        const processOrders = (orders: string[][]): OrderBookEntry[] =>
-          orders.map(([price, quantity]) => {
-            const priceFloat = parseFloat(price);
-            const quantityFloat = parseFloat(quantity);
-            return {
-              price,
-              quantity,
-              total: (priceFloat * quantityFloat).toFixed(2),
-            };
-          });
-
-        // Update all orders
-        setAsks(processOrders(data.asks));
-        setBids(processOrders(data.bids));
-      } else if ("p" in data && "q" in data) {
-        const newPrice = data.p;
-        setLastPrice(newPrice);
-        prevPriceRef.current = newPrice;
-      }
-    };
-
-    service.subscribe("orderbook", symbol, handleOrderBook);
-    service.subscribe("trade", symbol, handleOrderBook);
+    service.subscribe(symbol);
 
     return () => {
-      service.unsubscribe("orderbook", symbol, handleOrderBook);
-      service.unsubscribe("trade", symbol, handleOrderBook);
+      service.unsubscribe();
     };
   }, [symbol]);
 
@@ -156,7 +131,7 @@ export const OrderBook = ({ symbol }: OrderBookProps) => {
           <div
             className={clsx(
               "text-lg font-semibold",
-              lastPrice > prevPriceRef.current
+              parseFloat(lastPrice || "0") > 0
                 ? "text-green-500"
                 : "text-red-500"
             )}
